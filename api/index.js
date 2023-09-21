@@ -1,8 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require("mongoose");
-const User = require('./models/User');
-const Post = require('./models/Post');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -10,6 +8,11 @@ const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const uploadMiddleware = multer({ dest: 'uploads/' });
 const fs = require('fs');
+
+const User = require('./models/User');
+const Product = require('./models/Product');
+const Asset = require('./models/Asset');
+
 
 const salt = bcrypt.genSaltSync(10);
 const secret = 'asdfe45we45w345wegw345werjktjwertkj';
@@ -19,7 +22,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(__dirname + '/uploads'));
 
-mongoose.connect('mongodb+srv://blog:RD8paskYC8Ayj09u@cluster0.pflplid.mongodb.net/?retryWrites=true&w=majority');
+mongoose.connect('mongodb+srv://13nicholasa:MongoDB_123_Bluesnow@clothes-test-product-ba.d40hjiu.mongodb.net/?retryWrites=true&w=majority');
 
 app.post('/register', async (req,res) => {
   const {username,password} = req.body;
@@ -87,6 +90,124 @@ app.post('/post', uploadMiddleware.single('file'), async (req,res) => {
   });
 
 });
+app.post('/product', uploadMiddleware.fields([{ name: 'file', maxCount: 1 }, { name: 'item_second_image', maxCount: 1 }, { name: 'item_third_image', maxCount: 1 }]), async (req,res) => {
+  const file = req.files.file[0];
+  let {originalname,path} = file;
+  const parts = originalname.split('.');
+  const ext = parts[parts.length - 1];
+  const photoPath = path+'.'+ext;
+  fs.renameSync(path, photoPath);
+
+  const file2 = req.files.item_second_image[0];
+  originalname = file2['originalname'];
+  path  = file2['path'];
+  const parts2 = originalname.split('.');
+  const ext2 = parts2[parts2.length - 1];
+  const newPath2 = path+'.'+ext;
+  fs.renameSync(path, newPath2);
+
+  const file3 = req.files.item_third_image[0];
+  originalname = file3['originalname'];
+  path  = file3['path'];
+  const parts3 = originalname.split('.');
+  const ext3 = parts3[parts3.length - 1];
+  const newPath3 = path+'.'+ext3;
+  fs.renameSync(path, newPath3);
+
+  const {token} = req.cookies;
+  jwt.verify(token, secret, {}, async (err,info) => {
+    if (err) throw err;
+    const {
+      item_id,
+      item_collection_name,
+      item_price,
+      item_description,
+      item_colour,
+      item_colours_available,
+      item_sizes,
+      item_release,
+      item_type,
+      item_gender,
+      photoPath,
+      newPath2,
+      newPath3,
+    } = req.body;
+    const productDoc = await Product.create({
+      item_id,
+      item_collection_name,
+      item_photo:photoPath,
+      item_second_image:newPath2,
+      item_third_image:newPath3,
+      item_price,
+      item_description,
+      item_colour,
+      item_colours_available,
+      item_sizes,
+      item_release,
+      item_type,
+      item_gender,
+    });
+    res.json(productDoc);
+  });
+
+});
+
+app.post('/asset', uploadMiddleware.single('file'), async (req,res) => {
+  const {originalname,path} = req.file;
+  const parts = originalname.split('.');
+  const ext = parts[parts.length - 1];
+  const newPath = path+'.'+ext;
+  fs.renameSync(path, newPath);
+
+  const {token} = req.cookies;
+  jwt.verify(token, secret, {}, async (err,info) => {
+    if (err) throw err;
+    const {name,tags} = req.body;
+    const postDoc = await Asset.create({
+      name,
+      tags,
+      asset:newPath,
+    });
+    res.json(postDoc);
+  });
+});
+
+app.get('/product', async (req,res) => {
+  res.json(
+    await Product.find()
+      .limit(20)
+  );
+});
+
+app.get('/product/filter/:filter', async (req,res) => {
+
+  let filter = {item_colour: "Black"};
+  filter = {
+    '$and': [],
+  };
+
+  let filterEncoded = req.params;
+
+  let filtersArray = filterEncoded['filter'].split('|');
+  filtersArray.forEach(typeString => {
+
+    let [type, typeOptionsString] = typeString.split(':');
+    typeOptions = typeOptionsString.split('&');
+
+
+    let optionsObj = {$in: typeOptions};
+    let typeObj = {};
+    typeObj[type] = optionsObj;
+
+    filter['$and'].push(typeObj);
+  })
+  console.log(JSON.stringify(filter));
+  res.json(
+    await Product.find(filter)
+      .limit(20)
+  );
+});
+
 
 app.put('/post',uploadMiddleware.single('file'), async (req,res) => {
   let newPath = null;
@@ -132,6 +253,12 @@ app.get('/post/:id', async (req, res) => {
   const {id} = req.params;
   const postDoc = await Post.findById(id).populate('author', ['username']);
   res.json(postDoc);
+})
+
+app.get('/product/:id', async (req, res) => {
+  const {id} = req.params;
+  const productDoc = await Product.findById(id);
+  res.json(productDoc);
 })
 
 app.listen(4000);
