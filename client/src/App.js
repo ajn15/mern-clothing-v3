@@ -11,6 +11,7 @@ import CreatePost from "./pages/CreatePost";
 import PostPage from "./pages/PostPage";
 import EditPost from "./pages/EditPost";
 
+//List of pages
 function App() {
   return (
     <UserContextProvider>
